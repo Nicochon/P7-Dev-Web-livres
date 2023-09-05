@@ -1,5 +1,6 @@
 const Book = require('../models/book');
 const fs = require('fs');
+const sharp = require("sharp");
 
 exports.createBook = (req, res, next) => {
     const bookObject = JSON.parse(req.body.book);
@@ -45,9 +46,9 @@ exports.modifyBook = (req, res, next) => {
             } else {
                 const filename = book.imageUrl.split('/images/')[1];
                 fs.unlink(`images/${filename}`, () => {
-                    Book.updateOne({ _id: req.params.id}, { ...bookObject, _id: req.params.id})
-                        .then(() => res.status(200).json({message : 'Objet modifié!'}))
-                        .catch(error => res.status(401).json({ error }));
+                    Book.updateOne({_id: req.params.id}, {...bookObject, _id: req.params.id})
+                        .then(() => res.status(200).json({message: 'Objet modifié!'}))
+                        .catch(error => res.status(401).json({error}));
                 });
             }
         })
@@ -55,6 +56,53 @@ exports.modifyBook = (req, res, next) => {
             res.status(500).json({ error });
         });
 };
+
+
+// exports.modifyBook = (req, res, next) => {
+//     const bookObject = req.file ? {
+//         ...JSON.parse(req.body.book),
+//         imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+//     } : { ...req.body };
+//
+//     delete bookObject._userId;
+//
+//     Book.findOne({_id: req.params.id})
+//         .then((book) => {
+//             if (book.userId !== req.auth.userId) {
+//                 res.status(401).json({ message : 'Not authorized'});
+//             } else {
+//                 const filename = book.imageUrl.split('/images/')[1];
+//
+//                 // Read the new image file
+//                 const newImageBuffer = fs.readFileSync(req.file.path);
+//
+//                 const newFilename = `compressed_${filename}`; // New filename for the compressed image
+//
+//                 // Apply compression using Sharp to the new image
+//                 sharp(newImageBuffer)
+//                     .webp({ quality: 20 }) // You can adjust the compression quality here
+//                     .toFile(`images/${newFilename}`, (err, info) => {
+//                         if (err) {
+//                             res.status(500).json({ error: err.message });
+//                         } else {
+//                             // Update the book with the new compressed image URL
+//                             Book.updateOne({ _id: req.params.id}, { ...bookObject, imageUrl: `${req.protocol}://${req.get('host')}/images/${newFilename}`, _id: req.params.id})
+//                                 .then(() => {
+//                                     // Delete the original file after updating
+//                                     fs.unlink(req.file.path, () => {
+//                                         res.status(200).json({message : 'Objet modifié!'});
+//                                     });
+//                                 })
+//                                 .catch(error => res.status(401).json({ error }));
+//                         }
+//                     });
+//             }
+//         })
+//         .catch((error) => {
+//             res.status(500).json({ error });
+//         });
+// };
+
 
 exports.deleteBook= (req, res, next) => {
     Book.findOne({ _id: req.params.id})
@@ -108,7 +156,6 @@ exports.userRating = (req, res, next ) =>{
                     const avrg = total / array1.length;
                     const avrgDecimal = avrg.toFixed(2)
                     book.averageRating = avrgDecimal
-                    console.log(book.averageRating)
                     book.save()
                         .then((book) => {
                         res.status(200).json(book);
@@ -119,31 +166,46 @@ exports.userRating = (req, res, next ) =>{
         .catch(error => { res.status(401).json({ error })})
 };
 
+// exports.bigThree = (req, res, next ) =>{
+//     Book.find()
+//         .then(
+//             (book) => {
+//                 var allAverageRating = []
+//                 book.forEach(function(item){
+//                     allAverageRating.push(item.averageRating) ;
+//                 })
+//                 allAverageRating.sort((a, b) => a - b);
+//                 const bestBook =  allAverageRating.slice(-3);
+//
+//                 var arrayBestBook = []
+//                 bestBook.forEach(function (items){
+//                     book.forEach(function(item){
+//                         if (items === item.averageRating){
+//                             arrayBestBook.push(item);
+//                         }else{
+//                            null
+//                         }
+//                     })
+//                 })
+//                 arrayBestBook.sort((a, b) => a - b);
+//                 var unique = Array.from(new Set(arrayBestBook));
+//                 console.log(unique);
+//                 res.status(200).json(unique.slice(-3));
+//             }
+//         ).catch(
+//         (error) => {
+//             res.status(400).json({
+//                 error: error
+//             });
+//         }
+//     );
+// };
+
 exports.bigThree = (req, res, next ) =>{
-    Book.find()
+    Book.find().sort({ "averageRating": -1 }).limit(3)
         .then(
             (book) => {
-                var allAverageRating = []
-                book.forEach(function(item){
-                    allAverageRating.push(item.averageRating) ;
-                })
-                allAverageRating.sort((a, b) => a - b);
-                const bestBook =  allAverageRating.slice(-3);
-
-                var arrayBestBook = []
-                bestBook.forEach(function (items){
-                    book.forEach(function(item){
-                        if (items === item.averageRating){
-                            arrayBestBook.push(item);
-                        }else{
-                           null
-                        }
-                    })
-                })
-                arrayBestBook.sort((a, b) => a - b);
-                var unique = Array.from(new Set(arrayBestBook));
-                console.log(unique);
-                res.status(200).json(unique.slice(-3));
+                res.status(200).json(book);
             }
         ).catch(
         (error) => {
@@ -154,19 +216,3 @@ exports.bigThree = (req, res, next ) =>{
     );
 };
 
-
-
-
-// exports.romainExercice = (req, res, next ) =>{
-//     const valeurTableau = [2,5,4,9,2,5];
-//
-//     const valeurMax = Math.max(...valeurTableau)
-//     const valeurMin = Math.min(...valeurTableau)
-//     var total = 0;
-//     valeurTableau.forEach(function(item){
-//         total += item
-//     })
-//     const romain = total - valeurMax - valeurMin;
-//     const solution = romain / (valeurTableau.length - 2);
-//     console.log("la solution est "+solution)
-// };
